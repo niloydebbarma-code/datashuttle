@@ -1,23 +1,19 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, List
-
-if TYPE_CHECKING:
-    from datashuttle.utils.custom_types import (
-        DisplayMode,
-        TopLevelFolder,
-    )
-
 from pathlib import Path
-from typing import (
-    Optional,
-)
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 from datashuttle.configs import canonical_configs, canonical_folders
 from datashuttle.configs.config_class import Configs
 from datashuttle.utils import (
     validation,
 )
+
+if TYPE_CHECKING:
+    from datashuttle.utils.custom_types import (
+        DisplayMode,
+        TopLevelFolder,
+    )
 
 
 def validate_project_from_path(
@@ -107,6 +103,70 @@ def validate_project_from_path(
     )
 
     return error_messages
+
+
+def get_all_sub_and_ses_paths_from_path(
+    project_path: str | Path,
+    top_level_folder: Optional[TopLevelFolder] = "rawdata",
+) -> Dict[str, Union[List[Path], Dict[str, List[Path]]]]:
+    """Return filepaths to all subjects and sessions directly from a project path.
+
+    Enables discovery and inspection of NeuroBlueprint project structures with
+    minimal setup, without requiring project configuration files.
+
+    Parameters
+    ----------
+    project_path
+        Path to the project directory. Must contain at least one top-level
+        folder ('rawdata' or 'derivatives').
+
+    top_level_folder
+        The top-level folder ("rawdata" or "derivatives") to search.
+        If `None`, both are checked and combined. Default is "rawdata".
+
+    Returns
+    -------
+    Dict
+        A dictionary with "sub" key (list of Path objects for all subject folders)
+        and "ses" key (dict mapping subject name to list of Path objects for its session folders).
+
+    """
+    project_path = Path(project_path)
+    if not project_path.is_dir():
+        raise FileNotFoundError(
+            f"Cannot get paths. No directory found at `project_path`: {project_path}"
+        )
+
+    top_level_folders_to_search = _format_top_level_folder(top_level_folder)
+
+    all_sub_paths: List[Path] = []
+    all_ses_paths: Dict[str, List[Path]] = {}
+
+    for tlf in top_level_folders_to_search:
+        tlf_path = project_path / tlf
+        if not tlf_path.is_dir():
+            continue
+
+        for sub_dir in sorted(tlf_path.glob("sub-*")):
+            if sub_dir.is_dir():
+                if sub_dir not in all_sub_paths:
+                    all_sub_paths.append(sub_dir)
+
+                sub_name = sub_dir.name
+                if sub_name not in all_ses_paths:
+                    all_ses_paths[sub_name] = []
+
+                for ses_dir in sorted(sub_dir.glob("ses-*")):
+                    if (
+                        ses_dir.is_dir()
+                        and ses_dir not in all_ses_paths[sub_name]
+                    ):
+                        all_ses_paths[sub_name].append(ses_dir)
+
+                all_ses_paths[sub_name].sort(key=lambda p: p.name)
+
+    all_sub_paths.sort(key=lambda p: p.name)
+    return {"sub": all_sub_paths, "ses": all_ses_paths}
 
 
 def _format_top_level_folder(

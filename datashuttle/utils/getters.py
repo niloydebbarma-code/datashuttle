@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -12,15 +13,13 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from datashuttle.configs.config_class import Configs
     from datashuttle.utils.custom_types import Prefix, TopLevelFolder
 
 import warnings
 
 from datashuttle.configs import canonical_folders
-from datashuttle.utils import folders, utils
+from datashuttle.utils import folders, formatting, utils
 from datashuttle.utils.custom_exceptions import (
     ConfigError,
     NeuroBlueprintError,
@@ -394,3 +393,235 @@ def get_all_sub_and_ses_paths(
             all_ses_folder_paths[sub] = ses_folder_paths["local"]
 
     return {"sub": all_sub_folder_paths, "ses": all_ses_folder_paths}
+
+
+def get_subs(
+    cfg: Configs,
+    top_level_folder: TopLevelFolder = "rawdata",
+    return_full_path: bool = False,
+    include_central: bool = False,
+) -> Union[List[str], List[Path]]:
+    """Return all subject folder names or paths in the project.
+
+    Parameters
+    ----------
+    cfg
+        Datashuttle Configs.
+
+    top_level_folder
+        The top-level folder ("rawdata" or "derivatives"). Default is "rawdata".
+
+    return_full_path
+        If `True`, returns list of Path objects.
+        If `False`, returns list of subject name strings (e.g. `["sub-001", "sub-002"]`).
+        Default is `False`.
+
+    include_central
+        If `True`, combines subjects found locally and on central storage.
+        Default is `False`.
+
+    Returns
+    -------
+    Union[List[str], List[Path]]
+        Sorted list of unique subject names or paths.
+
+    """
+    sub_folder_paths = folders.search_project_for_sub_or_ses_names(
+        cfg,
+        top_level_folder,
+        None,
+        "sub-*",
+        include_central,
+        return_full_path=return_full_path,
+    )
+
+    if include_central:
+        res = sub_folder_paths["local"] + sub_folder_paths["central"]
+    else:
+        res = sub_folder_paths["local"]
+
+    if return_full_path:
+        unique: List[Path] = []
+        seen = set()
+        for p in res:
+            if p not in seen:
+                seen.add(p)
+                unique.append(p)
+        return sorted(unique)
+    else:
+        return sorted(list(set(res)))
+
+
+def get_ses(
+    cfg: Configs,
+    sub_name: str,
+    top_level_folder: TopLevelFolder = "rawdata",
+    return_full_path: bool = False,
+    include_central: bool = False,
+) -> Union[List[str], List[Path]]:
+    """Return all session folder names or paths for a given subject.
+
+    Parameters
+    ----------
+    cfg
+        Datashuttle Configs.
+
+    sub_name
+        The subject name (e.g. "sub-001" or "001").
+
+    top_level_folder
+        The top-level folder ("rawdata" or "derivatives"). Default is "rawdata".
+
+    return_full_path
+        If `True`, returns list of Path objects.
+        If `False`, returns list of session name strings (e.g. `["ses-001", "ses-002"]`).
+        Default is `False`.
+
+    include_central
+        If `True`, combines sessions found locally and on central storage.
+        Default is `False`.
+
+    Returns
+    -------
+    Union[List[str], List[Path]]
+        Sorted list of unique session names or paths for the subject.
+
+    """
+    formatted_sub = formatting.format_names([sub_name], "sub")[0]
+
+    ses_folder_paths = folders.search_project_for_sub_or_ses_names(
+        cfg,
+        top_level_folder,
+        formatted_sub,
+        "ses-*",
+        include_central,
+        return_full_path=return_full_path,
+    )
+
+    local_res = ses_folder_paths["local"]
+    central_res = ses_folder_paths["central"] if include_central else []
+
+    if not local_res and (not include_central or not central_res):
+        all_subs = get_subs(
+            cfg,
+            top_level_folder=top_level_folder,
+            return_full_path=False,
+            include_central=include_central,
+        )
+        all_sub_names: List[str] = [
+            str(s.name if isinstance(s, Path) else s) for s in all_subs
+        ]
+        matching_subs = [
+            s
+            for s in all_sub_names
+            if s == formatted_sub or s.startswith(f"{formatted_sub}_")
+        ]
+        if matching_subs:
+            res_all = []
+            for m_sub in matching_subs:
+                m_ses_paths = folders.search_project_for_sub_or_ses_names(
+                    cfg,
+                    top_level_folder,
+                    m_sub,
+                    "ses-*",
+                    include_central,
+                    return_full_path=return_full_path,
+                )
+                res_all += m_ses_paths["local"]
+                if include_central:
+                    res_all += m_ses_paths["central"]
+            if return_full_path:
+                unique_paths: List[Path] = []
+                seen_paths = set()
+                for p in res_all:
+                    if p not in seen_paths:
+                        seen_paths.add(p)
+                        unique_paths.append(p)
+                return sorted(unique_paths)
+            else:
+                return sorted(list(set(res_all)))
+
+    if include_central:
+        res = local_res + central_res
+    else:
+        res = local_res
+
+    if return_full_path:
+        unique_paths = []
+        seen_paths = set()
+        for p in res:
+            if p not in seen_paths:
+                seen_paths.add(p)
+                unique_paths.append(p)
+        return sorted(unique_paths)
+    else:
+        return sorted(list(set(res)))
+
+
+def get_datatype_folders(
+    cfg: Configs,
+    sub_name: str,
+    ses_name: Optional[str] = None,
+    top_level_folder: TopLevelFolder = "rawdata",
+    return_full_path: bool = False,
+    include_central: bool = False,
+) -> Union[List[str], List[Path]]:
+    """Return all canonical datatype folder names or paths in a subject or session folder.
+
+    Parameters
+    ----------
+    cfg
+        Datashuttle Configs.
+
+    sub_name
+        Subject name (e.g. "sub-001" or "001").
+
+    ses_name
+        Session name (e.g. "ses-001" or "001"). If None, searches at subject level.
+
+    top_level_folder
+        "rawdata" or "derivatives". Default is "rawdata".
+
+    return_full_path
+        If `True`, returns list of Path objects. Default is `False`.
+
+    include_central
+        If `True`, combines folders found locally and on central storage. Default is `False`.
+
+    Returns
+    -------
+    Union[List[str], List[Path]]
+        Sorted list of unique datatype folder names or paths found.
+
+    """
+    formatted_sub = formatting.format_names([sub_name], "sub")[0]
+    formatted_ses = (
+        formatting.format_names([ses_name], "ses")[0] if ses_name else None
+    )
+
+    all_results = []
+    for loc in ["local", "central"] if include_central else ["local"]:
+        base = cfg.get_base_folder(loc, top_level_folder)  # type: ignore
+        datatype_items = folders.search_for_datatype_folders(
+            cfg, base, loc, formatted_sub, formatted_ses
+        )
+        for _, folder_obj in datatype_items:
+            path_val = (
+                base / formatted_sub / formatted_ses / folder_obj.name
+                if formatted_ses
+                else base / formatted_sub / folder_obj.name
+            )
+            all_results.append(
+                path_val if return_full_path else folder_obj.name
+            )
+
+    if return_full_path:
+        unique_paths: List[Path] = []
+        seen_paths = set()
+        for p in all_results:
+            if p not in seen_paths:
+                seen_paths.add(p)
+                unique_paths.append(p)
+        return sorted(unique_paths)
+    else:
+        return sorted(list(set(all_results)))
