@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Dict,
@@ -13,6 +12,8 @@ from typing import (
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from datashuttle.configs.config_class import Configs
     from datashuttle.utils.custom_types import Prefix, TopLevelFolder
 
@@ -426,7 +427,7 @@ def get_subs(
         Sorted list of unique subject names or paths.
 
     """
-    sub_folder_paths = folders.search_project_for_sub_or_ses_names(
+    sub_paths = folders.search_project_for_sub_or_ses_names(
         cfg,
         top_level_folder,
         None,
@@ -434,22 +435,10 @@ def get_subs(
         include_central,
         return_full_path=return_full_path,
     )
-
-    if include_central:
-        res = sub_folder_paths["local"] + sub_folder_paths["central"]
-    else:
-        res = sub_folder_paths["local"]
-
-    if return_full_path:
-        unique: List[Path] = []
-        seen = set()
-        for p in res:
-            if p not in seen:
-                seen.add(p)
-                unique.append(p)
-        return sorted(unique)
-    else:
-        return sorted(list(set(res)))
+    all_subs = sub_paths["local"] + (
+        sub_paths["central"] if include_central else []
+    )
+    return sorted(list(dict.fromkeys(all_subs)))
 
 
 def get_ses(
@@ -489,73 +478,39 @@ def get_ses(
     """
     formatted_sub = formatting.format_names([sub_name], "sub")[0]
 
-    ses_folder_paths = folders.search_project_for_sub_or_ses_names(
+    subs = folders.search_project_for_sub_or_ses_names(
         cfg,
         top_level_folder,
-        formatted_sub,
-        "ses-*",
+        None,
+        "sub-*",
         include_central,
-        return_full_path=return_full_path,
+        return_full_path=False,
     )
+    all_subs = set(
+        subs["local"] + (subs["central"] if include_central else [])
+    )
+    matching_subs = [
+        s
+        for s in all_subs
+        if s == formatted_sub or s.startswith(f"{formatted_sub}_")
+    ] or [formatted_sub]
 
-    local_res = ses_folder_paths["local"]
-    central_res = ses_folder_paths["central"] if include_central else []
-
-    if not local_res and (not include_central or not central_res):
-        all_subs = get_subs(
+    all_ses = []
+    for sub in matching_subs:
+        ses_paths = folders.search_project_for_sub_or_ses_names(
             cfg,
-            top_level_folder=top_level_folder,
-            return_full_path=False,
-            include_central=include_central,
+            top_level_folder,
+            sub,
+            "ses-*",
+            include_central,
+            return_full_path=return_full_path,
         )
-        all_sub_names: List[str] = [
-            str(s.name if isinstance(s, Path) else s) for s in all_subs
-        ]
-        matching_subs = [
-            s
-            for s in all_sub_names
-            if s == formatted_sub or s.startswith(f"{formatted_sub}_")
-        ]
-        if matching_subs:
-            res_all = []
-            for m_sub in matching_subs:
-                m_ses_paths = folders.search_project_for_sub_or_ses_names(
-                    cfg,
-                    top_level_folder,
-                    m_sub,
-                    "ses-*",
-                    include_central,
-                    return_full_path=return_full_path,
-                )
-                res_all += m_ses_paths["local"]
-                if include_central:
-                    res_all += m_ses_paths["central"]
-            if return_full_path:
-                unique_paths: List[Path] = []
-                seen_paths = set()
-                for p in res_all:
-                    if p not in seen_paths:
-                        seen_paths.add(p)
-                        unique_paths.append(p)
-                return sorted(unique_paths)
-            else:
-                return sorted(list(set(res_all)))
+        all_ses.extend(
+            ses_paths["local"]
+            + (ses_paths["central"] if include_central else [])
+        )
 
-    if include_central:
-        res = local_res + central_res
-    else:
-        res = local_res
-
-    if return_full_path:
-        unique_paths = []
-        seen_paths = set()
-        for p in res:
-            if p not in seen_paths:
-                seen_paths.add(p)
-                unique_paths.append(p)
-        return sorted(unique_paths)
-    else:
-        return sorted(list(set(res)))
+    return sorted(list(dict.fromkeys(all_ses)))
 
 
 def get_datatype_folders(
@@ -599,29 +554,16 @@ def get_datatype_folders(
         formatting.format_names([ses_name], "ses")[0] if ses_name else None
     )
 
-    all_results = []
-    for loc in ["local", "central"] if include_central else ["local"]:
+    results = []
+    locations = ["local", "central"] if include_central else ["local"]
+    for loc in locations:
         base = cfg.get_base_folder(loc, top_level_folder)  # type: ignore
-        datatype_items = folders.search_for_datatype_folders(
+        for _, folder_obj in folders.search_for_datatype_folders(
             cfg, base, loc, formatted_sub, formatted_ses
-        )
-        for _, folder_obj in datatype_items:
-            path_val = (
-                base / formatted_sub / formatted_ses / folder_obj.name
-                if formatted_ses
-                else base / formatted_sub / folder_obj.name
+        ):
+            target = (
+                base / formatted_sub / (formatted_ses or "") / folder_obj.name
             )
-            all_results.append(
-                path_val if return_full_path else folder_obj.name
-            )
+            results.append(target if return_full_path else folder_obj.name)
 
-    if return_full_path:
-        unique_paths: List[Path] = []
-        seen_paths = set()
-        for p in all_results:
-            if p not in seen_paths:
-                seen_paths.add(p)
-                unique_paths.append(p)
-        return sorted(unique_paths)
-    else:
-        return sorted(list(set(all_results)))
+    return sorted(list(dict.fromkeys(results)))
