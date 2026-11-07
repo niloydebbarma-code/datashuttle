@@ -326,6 +326,10 @@ def get_existing_project_paths() -> List[Path]:
     return existing_project_paths
 
 
+SUB_SEARCH_STR = "sub-*"
+SES_SEARCH_STR = "ses-*"
+
+
 def get_all_sub_and_ses_paths(
     cfg: Configs,
     top_level_folder: TopLevelFolder,
@@ -361,7 +365,7 @@ def get_all_sub_and_ses_paths(
         cfg,
         top_level_folder,
         None,
-        "sub-*",
+        SUB_SEARCH_STR,
         include_central,
         return_full_path=True,
     )
@@ -381,7 +385,7 @@ def get_all_sub_and_ses_paths(
             cfg,
             top_level_folder,
             sub,
-            "ses-*",
+            SES_SEARCH_STR,
             include_central,
             return_full_path=True,
         )
@@ -401,7 +405,7 @@ def get_subs(
     top_level_folder: TopLevelFolder = "rawdata",
     return_full_path: bool = False,
     include_central: bool = False,
-) -> Union[List[str], List[Path]]:
+) -> list[str] | list[Path]:
     """Return all subject folder names or paths in the project.
 
     Parameters
@@ -423,7 +427,7 @@ def get_subs(
 
     Returns
     -------
-    Union[List[str], List[Path]]
+    list[str] | list[Path]
         Sorted list of unique subject names or paths.
 
     """
@@ -431,14 +435,14 @@ def get_subs(
         cfg,
         top_level_folder,
         None,
-        "sub-*",
+        SUB_SEARCH_STR,
         include_central,
         return_full_path=return_full_path,
     )
     all_subs = sub_paths["local"] + (
         sub_paths["central"] if include_central else []
     )
-    return sorted(list(dict.fromkeys(all_subs)))
+    return sorted(dict.fromkeys(all_subs))
 
 
 def get_ses(
@@ -447,7 +451,7 @@ def get_ses(
     top_level_folder: TopLevelFolder = "rawdata",
     return_full_path: bool = False,
     include_central: bool = False,
-) -> Union[List[str], List[Path]]:
+) -> list[str] | list[Path]:
     """Return all session folder names or paths for a given subject.
 
     Parameters
@@ -472,7 +476,7 @@ def get_ses(
 
     Returns
     -------
-    Union[List[str], List[Path]]
+    list[str] | list[Path]
         Sorted list of unique session names or paths for the subject.
 
     """
@@ -482,7 +486,7 @@ def get_ses(
         cfg,
         top_level_folder,
         None,
-        "sub-*",
+        SUB_SEARCH_STR,
         include_central,
         return_full_path=False,
     )
@@ -501,7 +505,7 @@ def get_ses(
             cfg,
             top_level_folder,
             sub,
-            "ses-*",
+            SES_SEARCH_STR,
             include_central,
             return_full_path=return_full_path,
         )
@@ -510,17 +514,17 @@ def get_ses(
             + (ses_paths["central"] if include_central else [])
         )
 
-    return sorted(list(dict.fromkeys(all_ses)))
+    return sorted(dict.fromkeys(all_ses))
 
 
 def get_datatype_folders(
     cfg: Configs,
     sub_name: str,
-    ses_name: Optional[str] = None,
+    ses_name: str | None = None,
     top_level_folder: TopLevelFolder = "rawdata",
     return_full_path: bool = False,
     include_central: bool = False,
-) -> Union[List[str], List[Path]]:
+) -> list[str] | list[Path]:
     """Return all canonical datatype folder names or paths in a subject or session folder.
 
     Parameters
@@ -545,7 +549,7 @@ def get_datatype_folders(
 
     Returns
     -------
-    Union[List[str], List[Path]]
+    list[str] | list[Path]
         Sorted list of unique datatype folder names or paths found.
 
     """
@@ -566,4 +570,4 @@ def get_datatype_folders(
             )
             results.append(target if return_full_path else folder_obj.name)
 
-    return sorted(list(dict.fromkeys(results)))
+    return sorted(dict.fromkeys(results))

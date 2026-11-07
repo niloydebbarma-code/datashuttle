@@ -1372,7 +1372,7 @@ class DataShuttle:
         top_level_folder: TopLevelFolder = "rawdata",
         return_full_path: bool = False,
         include_central: bool = False,
-    ) -> Union[List[str], List[Path]]:
+    ) -> list[str] | list[Path]:
         """Return all subject folder names or paths in the project.
 
         Parameters
@@ -1391,7 +1391,7 @@ class DataShuttle:
 
         Returns
         -------
-        Union[List[str], List[Path]]
+        list[str] | list[Path]
             Sorted list of unique subject names or paths.
 
         """
@@ -1412,7 +1412,7 @@ class DataShuttle:
         top_level_folder: TopLevelFolder = "rawdata",
         return_full_path: bool = False,
         include_central: bool = False,
-    ) -> Union[List[str], List[Path]]:
+    ) -> list[str] | list[Path]:
         """Return all session folder names or paths for a given subject.
 
         Parameters
@@ -1434,7 +1434,7 @@ class DataShuttle:
 
         Returns
         -------
-        Union[List[str], List[Path]]
+        list[str] | list[Path]
             Sorted list of unique session names or paths for the subject.
 
         """
@@ -1454,7 +1454,7 @@ class DataShuttle:
         self,
         top_level_folder: TopLevelFolder = "rawdata",
         include_central: bool = False,
-    ) -> Dict[str, Union[List[Path], Dict[str, List[Path]]]]:
+    ) -> dict[str, list[Path] | dict[str, list[Path]]]:
         """Return a dictionary containing paths to all subjects and sessions in the project.
 
         Parameters
@@ -1468,7 +1468,7 @@ class DataShuttle:
 
         Returns
         -------
-        Dict
+        dict
             Dictionary with "sub" key (list of Path objects for all subject folders)
             and "ses" key (dict mapping subject name to list of Path objects for its session folders).
 
@@ -1487,7 +1487,7 @@ class DataShuttle:
         self,
         top_level_folder: TopLevelFolder = "rawdata",
         include_central: bool = False,
-    ) -> Dict[str, Union[List[Path], Dict[str, List[Path]]]]:
+    ) -> dict[str, list[Path] | dict[str, list[Path]]]:
         """Return all subject and session paths (alias for `get_all_sub_and_ses_paths`)."""
         return self.get_all_sub_and_ses_paths(
             top_level_folder=top_level_folder,
@@ -1498,11 +1498,11 @@ class DataShuttle:
     def get_datatype_folders(
         self,
         sub_name: str,
-        ses_name: Optional[str] = None,
+        ses_name: str | None = None,
         top_level_folder: TopLevelFolder = "rawdata",
         return_full_path: bool = False,
         include_central: bool = False,
-    ) -> Union[List[str], List[Path]]:
+    ) -> list[str] | list[Path]:
         """Return all canonical datatype folder names or paths in a subject or session folder.
 
         Parameters
@@ -1524,7 +1524,7 @@ class DataShuttle:
 
         Returns
         -------
-        Union[List[str], List[Path]]
+        list[str] | list[Path]
             Sorted list of unique datatype folder names or paths found.
 
         """
@@ -1543,8 +1543,8 @@ class DataShuttle:
     @staticmethod
     def get_all_sub_and_ses_paths_from_path(
         project_path: str | Path,
-        top_level_folder: Optional[TopLevelFolder] = "rawdata",
-    ) -> Dict[str, Union[List[Path], Dict[str, List[Path]]]]:
+        top_level_folder: TopLevelFolder | None = "rawdata",
+    ) -> dict[str, list[Path] | dict[str, list[Path]]]:
         """Return filepaths to all subjects and sessions directly from a project path.
 
         Parameters
@@ -1557,7 +1557,7 @@ class DataShuttle:
 
         Returns
         -------
-        Dict
+        dict
             Dictionary with "sub" key (list of subject Paths)
             and "ses" key (dict mapping subject name to list of session Paths).
 
